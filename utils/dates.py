@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+from dateutil.parser import parse
 from nba_api.stats.library.parameters import Season
 
 
@@ -7,8 +8,12 @@ def date_to_str(date):
 
 
 def str_to_date(date_str):
-    return datetime.strptime(date_str, '%m/%d/%Y')
+    return parse(date_str)
 
+
+# given a date string, returns the date string for the previous day
+def yesterday(date_str):
+    return date_to_str(str_to_date(date_str) - timedelta(1))
 
 def start_year_to_season(start_year):
     return '{}-{}'.format(start_year, str(start_year + 1)[2:])
