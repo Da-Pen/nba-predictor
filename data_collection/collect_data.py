@@ -6,7 +6,7 @@ from time import sleep
 import numpy as np
 
 from constants import data_directory, output_file, input_file, relevant_team_perf_metrics, stats_to_be_averaged
-from team_stats import GameOverview
+from game_overview import GameOverview
 from utils.dates import get_season_start_and_end_dates, start_year_to_season
 
 
@@ -38,11 +38,14 @@ def get_team_gamelogs_for_season(team_id, season_start_year):
 
 
 # given a matchup string, which is of format either "TEAM1 vs. TEAM2" or "TEAM1 @ TEAM2",
-# returns the names of the two teams
+# returns the names of the two teams, with the home team first and the away team second
 def get_teams_by_matchup_str(matchup: str):
     s = matchup.split()
-    assert len(s) == 3 and s[1] in {'vs.', '@'}
-    return s[0], s[2]
+    assert len(s) == 3
+    if s[1] == 'vs.':
+        return s[0], s[2]
+    assert(s[1] == '@')
+    return s[2], s[0]
 
 
 def get_league_gamelogs(season_start_year):
@@ -52,29 +55,31 @@ def get_league_gamelogs(season_start_year):
         season=start_year_to_season(season_start_year),
         date_from_nullable=start_date,
         date_to_nullable=end_date).league_game_log.get_dict())
-    # remove duplicates
+    # remove duplicates and map to GameOverview objects
     seen_game_ids = set()
     new_gamelogs = []
     for game in gamelogs:
         if game['GAME_ID'] not in seen_game_ids:
             seen_game_ids.add(game['GAME_ID'])
-            team1, team2 = get_teams_by_matchup_str(game['MATCHUP'])
-            team1_won = (team1 == game['TEAM_ABBREVIATION']) == (game['WL'] == 'W')
+            home_team, away_team = get_teams_by_matchup_str(game['MATCHUP'])
+            home_team_won = (home_team == game['TEAM_ABBREVIATION']) == (game['WL'] == 'W')
             new_gamelogs.append(
                 GameOverview(
                     game['GAME_ID'],
                     game['GAME_DATE'],
-                    team_ids_map[team1 if team1_won else team2],
-                    team_ids_map[team2 if team1_won else team1]))
+                    team_ids_map[home_team],
+                    team_ids_map[away_team],
+                    home_team_won
+                )
+            )
     return new_gamelogs
 
 
-# given a team's data (dict), returns a list that can be saved
-def encode_data(team1_data, team2_data):
+# given the teams data, returns a list that can be saved and later used as input data for the ML model
+def encode_data(home_team_data, away_team_data):
     # extract relevant data from raw data dict
-    # return [team1_data[metric] - team2_data[metric] for metric in relevant_team_perf_metrics]
-    return [team1_data[metric] for metric in relevant_team_perf_metrics] + \
-        [team2_data[metric] for metric in relevant_team_perf_metrics]
+    return [home_team_data[metric] for metric in relevant_team_perf_metrics] + \
+        [away_team_data[metric] for metric in relevant_team_perf_metrics]
 
 
 # given a list of games for a team in chronological order, returns a dict which maps a game id to the accumulated stats
@@ -105,43 +110,46 @@ def accumulate_team_gamelog_stats(gamelogs):
 
 
 def main():
+    # get all the games in the NBA league for the season
+    games = get_league_gamelogs(2018)
+
+    # create a map of every team's performance before each one of their games
     team_performance_map = {}
     for team in teams.get_teams():
         print(f'Getting team stats for {team["abbreviation"]}...')
-        sleep(1)
+        sleep(1)  # delay before next request to prevent getting temporarily banned from nba api
         team_id = team['id']
         team_gamelogs = get_team_gamelogs_for_season(team_id, 2018)
         team_gamelogs_accum = accumulate_team_gamelog_stats(team_gamelogs)
         team_performance_map[team_id] = team_gamelogs_accum
 
-    games = get_league_gamelogs(2018)
+    # now, for every game, create an input / output pair to use in the ML model
     # keep list of all seen teams so that we don't use stats for a team that has not played any games yet as input
     seen_teams = set()
-    # lists of winning and losing data to use as inputs for the ML model
-    winning_input = []
-    losing_input = []
+    ml_input_data = []
+    ml_output_data = []
     for game in games:
-        if game.winning_team_id in seen_teams and game.losing_team_id in seen_teams:
-            # get winning team stats
-            winning_team_data = team_performance_map[game.winning_team_id][str(game.game_id)]
-            # get losing team stats
-            losing_team_data = team_performance_map[game.losing_team_id][str(game.game_id)]
-
-            winning_input.append((winning_team_data, losing_team_data))
-            losing_input.append((losing_team_data, winning_team_data))
-
+        if game.home_team_id in seen_teams and game.away_team_id in seen_teams:
+            # get home team stats
+            home_team_data = team_performance_map[game.home_team_id][str(game.game_id)]
+            # get away team stats
+            away_team_data = team_performance_map[game.away_team_id][str(game.game_id)]
+            # save input and expected output
+            ml_input_data.append(encode_data(home_team_data, away_team_data))
+            ml_output_data.append(1 if game.home_team_won else 0)
         else:
-            seen_teams.add(game.winning_team_id)
-            seen_teams.add(game.losing_team_id)
+            seen_teams.add(game.home_team_id)
+            seen_teams.add(game.away_team_id)
 
+    # now write the input and output to files
     # write input and output to files
     # create directory if it doesn't exist
     if not os.path.exists(data_directory):
         os.makedirs(data_directory)
     # write input to file
-    np.save(input_file, np.array([encode_data(team1, team2) for team1, team2 in winning_input + losing_input]))
+    np.save(input_file, np.array(ml_input_data))
     # write output to file
-    np.save(output_file, np.array([1]*len(winning_input) + [0]*len(losing_input)))
+    np.save(output_file, np.array(ml_output_data))
 
 
 if __name__ == '__main__':

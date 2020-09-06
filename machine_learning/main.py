@@ -26,9 +26,9 @@ def main():
     output_arr = np.load('../' + output_file)
 
     # shuffle the numpy arrays so that the validation set doesn't only include losing games
-    p = np.random.permutation(len(input_arr))
-    input_arr = input_arr[p]
-    output_arr = output_arr[p]
+    # p = np.random.permutation(len(input_arr))
+    # input_arr = input_arr[p]
+    # output_arr = output_arr[p]
 
     # evaluate baseline model with standardized dataset
     estimators = [
