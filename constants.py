@@ -7,7 +7,6 @@ relevant_team_perf_metrics = [
     'W', 'L', 'W_PCT', 'FGM', 'FGA', 'FG_PCT', 'FG3M', 'FG3A', 'FG3_PCT', 'FTM', 'FTA',
     'FT_PCT', 'OREB', 'DREB', 'AST', 'TOV', 'STL', 'BLK', 'BLKA', 'PF', 'PFD', 'PTS', 'PLUS_MINUS'
 ]
-# relevant_team_perf_metrics = ['W_PCT']
 
 # list of metrics to be averaged when accumulating stats for a team
 stats_to_be_averaged = [

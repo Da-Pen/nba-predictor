@@ -11,7 +11,7 @@ from constants import input_file, output_file, relevant_team_perf_metrics
 def baseline_model():
     model = tf.keras.Sequential([
         tf.keras.layers.Dense(
-            units=len(relevant_team_perf_metrics)/4,
+            units=len(relevant_team_perf_metrics)*2,
             input_dim=len(relevant_team_perf_metrics)*2,
             activation='relu'),
         tf.keras.layers.Dense(units=1, activation='sigmoid')
@@ -21,19 +21,24 @@ def baseline_model():
 
 
 def main():
+    # hyperparameters
     batch_size = 32
+    epochs = 10
+    # max number of training sets to train on. Used to check at which point more data doesn't result in a better model.
+    # -1 for no cap.
+    training_data_cap = -1
+
     input_arr = np.load('../' + input_file)
     output_arr = np.load('../' + output_file)
-
-    # shuffle the numpy arrays so that the validation set doesn't only include losing games
-    # p = np.random.permutation(len(input_arr))
-    # input_arr = input_arr[p]
-    # output_arr = output_arr[p]
+    print(input_arr.shape, output_arr.shape)
+    if training_data_cap != -1:
+        input_arr = input_arr[:training_data_cap]
+        output_arr = output_arr[:training_data_cap]
 
     # evaluate baseline model with standardized dataset
     estimators = [
         ('standardize', StandardScaler()),
-        ('mlp', KerasClassifier(build_fn=baseline_model, epochs=10, batch_size=batch_size, verbose=0))
+        ('mlp', KerasClassifier(build_fn=baseline_model, epochs=epochs, batch_size=batch_size, verbose=0))
     ]
     pipeline = Pipeline(estimators)
     kfold = StratifiedKFold(n_splits=10, shuffle=True)

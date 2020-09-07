@@ -110,36 +110,40 @@ def accumulate_team_gamelog_stats(gamelogs):
 
 
 def main():
-    # get all the games in the NBA league for the season
-    games = get_league_gamelogs(2018)
 
-    # create a map of every team's performance before each one of their games
-    team_performance_map = {}
-    for team in teams.get_teams():
-        print(f'Getting team stats for {team["abbreviation"]}...')
-        sleep(1)  # delay before next request to prevent getting temporarily banned from nba api
-        team_id = team['id']
-        team_gamelogs = get_team_gamelogs_for_season(team_id, 2018)
-        team_gamelogs_accum = accumulate_team_gamelog_stats(team_gamelogs)
-        team_performance_map[team_id] = team_gamelogs_accum
-
-    # now, for every game, create an input / output pair to use in the ML model
-    # keep list of all seen teams so that we don't use stats for a team that has not played any games yet as input
-    seen_teams = set()
     ml_input_data = []
     ml_output_data = []
-    for game in games:
-        if game.home_team_id in seen_teams and game.away_team_id in seen_teams:
-            # get home team stats
-            home_team_data = team_performance_map[game.home_team_id][str(game.game_id)]
-            # get away team stats
-            away_team_data = team_performance_map[game.away_team_id][str(game.game_id)]
-            # save input and expected output
-            ml_input_data.append(encode_data(home_team_data, away_team_data))
-            ml_output_data.append(1 if game.home_team_won else 0)
-        else:
-            seen_teams.add(game.home_team_id)
-            seen_teams.add(game.away_team_id)
+
+    years = [2017, 2018] # years to get data for
+    for year in years:
+        # get all the games in the NBA league for the season
+        games = get_league_gamelogs(year)
+
+        # create a map of every team's performance before each one of their games
+        team_performance_map = {}
+        for team in teams.get_teams():
+            print(f'Getting team stats for {team["abbreviation"]}...')
+            sleep(1)  # delay before next request to prevent getting temporarily banned from nba api
+            team_id = team['id']
+            team_gamelogs = get_team_gamelogs_for_season(team_id, year)
+            team_gamelogs_accum = accumulate_team_gamelog_stats(team_gamelogs)
+            team_performance_map[team_id] = team_gamelogs_accum
+
+        # now, for every game, create an input / output pair to use in the ML model
+        # keep list of all seen teams so that we don't use stats for a team that has not played any games yet as input
+        seen_teams = set()
+        for game in games:
+            if game.home_team_id in seen_teams and game.away_team_id in seen_teams:
+                # get home team stats
+                home_team_data = team_performance_map[game.home_team_id][str(game.game_id)]
+                # get away team stats
+                away_team_data = team_performance_map[game.away_team_id][str(game.game_id)]
+                # save input and expected output
+                ml_input_data.append(encode_data(home_team_data, away_team_data))
+                ml_output_data.append(1 if game.home_team_won else 0)
+            else:
+                seen_teams.add(game.home_team_id)
+                seen_teams.add(game.away_team_id)
 
     # now write the input and output to files
     # write input and output to files
