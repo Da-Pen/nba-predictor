@@ -28,6 +28,8 @@ Adjusting the epochs, number of layers, input data size, or batch size didn't ha
   
   we achieve ~63% accuracy. Not really better than just considering win percentage.
 - Accounting for "home team advantage" bumps up the accuracy to ~65%
+- Using v2 of the relevant metrics increases the accuracy to ~68%
+  - These metrics include things like offensive / defensive ratings, assist ratio and rebound percentage
 
 ### TODOs
 - test out different combinations of metrics to use as input

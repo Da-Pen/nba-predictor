@@ -5,14 +5,14 @@ from sklearn.preprocessing import StandardScaler
 import numpy as np
 from tensorflow.python.keras.wrappers.scikit_learn import KerasClassifier
 
-from constants import input_file, output_file, relevant_team_perf_metrics
+from constants import input_file, output_file, relevant_team_perf_metrics, relevant_team_perf_metrics_v2
 
 
 def baseline_model():
     model = tf.keras.Sequential([
         tf.keras.layers.Dense(
-            units=len(relevant_team_perf_metrics)*2,
-            input_dim=len(relevant_team_perf_metrics)*2,
+            units=(len(relevant_team_perf_metrics) + len(relevant_team_perf_metrics_v2))*2,
+            input_dim=(len(relevant_team_perf_metrics) + len(relevant_team_perf_metrics_v2))*2,
             activation='relu'),
         tf.keras.layers.Dense(units=1, activation='sigmoid')
     ])
@@ -30,7 +30,6 @@ def main():
 
     input_arr = np.load('../' + input_file)
     output_arr = np.load('../' + output_file)
-    print(input_arr.shape, output_arr.shape)
     if training_data_cap != -1:
         input_arr = input_arr[:training_data_cap]
         output_arr = output_arr[:training_data_cap]
