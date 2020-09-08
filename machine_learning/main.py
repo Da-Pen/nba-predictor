@@ -5,14 +5,14 @@ from sklearn.preprocessing import StandardScaler
 import numpy as np
 from tensorflow.python.keras.wrappers.scikit_learn import KerasClassifier
 
-from constants import input_file, output_file, relevant_team_perf_metrics, relevant_team_perf_metrics_v2
+from constants import input_file, output_file, relevant_team_perf_metrics_v2
 
 
 def baseline_model():
     model = tf.keras.Sequential([
         tf.keras.layers.Dense(
-            units=(len(relevant_team_perf_metrics) + len(relevant_team_perf_metrics_v2))*2,
-            input_dim=(len(relevant_team_perf_metrics) + len(relevant_team_perf_metrics_v2))*2,
+            units=len(relevant_team_perf_metrics_v2)*2,
+            input_dim=len(relevant_team_perf_metrics_v2)*2,
             activation='relu'),
         tf.keras.layers.Dense(units=1, activation='sigmoid')
     ])

@@ -5,8 +5,7 @@ from nba_api.stats.static import teams
 from time import sleep
 import numpy as np
 
-from constants import data_directory, output_file, input_file, relevant_team_perf_metrics, stats_to_be_averaged, \
-    keys_to_remove_prefixes_from, relevant_team_perf_metrics_v2
+from constants import data_directory, output_file, input_file, keys_to_remove_prefixes_from, relevant_team_perf_metrics_v2
 from game_overview import GameOverview
 from utils.dates import get_season_start_and_end_dates, start_year_to_season
 
@@ -18,24 +17,6 @@ def reformat_response(response_dict):
 
 def get_team_abbrev_to_id_map():
     return {t['abbreviation']: t['id'] for t in teams.get_teams()}
-
-
-def get_team_gamelogs(team_id, season="", date_from="", date_to=""):
-    t = teamgamelogs.TeamGameLogs(team_id_nullable=team_id,
-                                  season_nullable=season,
-                                  date_from_nullable=date_from,
-                                  date_to_nullable=date_to)
-    d = t.team_game_logs.get_dict()
-    d['data'].reverse()  # the dates are given in reverse chrono. order, but we want them in chrono. order
-    return reformat_response(d)
-
-
-def get_team_gamelogs_for_season(team_id, season_start_year):
-    start_date, end_date = get_season_start_and_end_dates(season_start_year)
-    return get_team_gamelogs(team_id,
-                             start_year_to_season(season_start_year),
-                             start_date,
-                             end_date)
 
 
 # given a matchup string, which is of format either "TEAM1 vs. TEAM2" or "TEAM1 @ TEAM2",
@@ -79,37 +60,9 @@ def get_league_gamelogs(season_start_year):
 # given the teams data, returns a list that can be saved and later used as input data for the ML model
 def encode_data(home_team_data, away_team_data):
     # extract relevant data from raw data dict
-    return [home_team_data[metric] for metric in relevant_team_perf_metrics + relevant_team_perf_metrics_v2] + \
-        [away_team_data[metric] for metric in relevant_team_perf_metrics + relevant_team_perf_metrics_v2]
+    return [home_team_data[metric] for metric in relevant_team_perf_metrics_v2] + \
+        [away_team_data[metric] for metric in relevant_team_perf_metrics_v2]
 
-
-# given a list of games for a team in chronological order, returns a dict which maps a game id to the accumulated stats
-# of the team up to but not including the date of the game.
-# gamelogs should be a list of gamelog dicts (ex. [{'SEASON_YEAR': '2019-20', 'TEAM_ID': 123, ... }, {...}, ...]
-# returns a map of accumulated stats that looks like
-#   { game_id: {'W': 6, 'L': 4, 'W_PCT': 0.6, 'FGM': 34.5, ... } }
-def accumulate_team_gamelog_stats(gamelogs, season_start_year):
-    wins = losses = 0
-
-    # get team's estimated metrics for that season
-
-    for i in range(len(gamelogs)):
-        if gamelogs[i]['WL'] == 'W':
-            wins += 1
-        else:
-            losses += 1
-        gamelogs[i]['W'] = wins
-        gamelogs[i]['L'] = losses
-        gamelogs[i]['W_PCT'] = wins/(wins + losses)
-        if i >= 1:
-            for metric in stats_to_be_averaged:
-                gamelogs[i][metric] = (gamelogs[i-1][metric]*i + gamelogs[i][metric])/(i+1)
-
-    game_id_to_accum_stats = {}
-    for i in range(1, len(gamelogs)):
-        game_id_to_accum_stats[gamelogs[i]['GAME_ID']] = \
-            {key: gamelogs[i-1][key] for key in gamelogs[i-1] if key in relevant_team_perf_metrics}
-    return game_id_to_accum_stats
 
 
 def remove_east_west_prefixes(d):
@@ -135,21 +88,12 @@ def main():
     ml_input_data = []
     ml_output_data = []
 
-    years = [2017, 2018] # years to get data for
+    years = range(2017, 2020)  # years to get data for
     for year in years:
+        print(f'Collecting data for season {start_year_to_season(year)}...')
         sleep(1)
         # get all the games in the NBA league for the season
         games = get_league_gamelogs(year)
-
-        # create a map of every team's performance before each one of their games
-        team_performance_map = {}
-        for team in teams.get_teams():
-            print(f'Getting team stats for {team["abbreviation"]}...')
-            sleep(1)  # delay before next request to prevent getting temporarily banned from nba api
-            team_id = team['id']
-            team_gamelogs = get_team_gamelogs_for_season(team_id, year)
-            team_gamelogs_accum = accumulate_team_gamelog_stats(team_gamelogs, year)
-            team_performance_map[team_id] = team_gamelogs_accum
 
         team_estimated_metrics = get_team_estimated_metrics(year)
 
@@ -165,8 +109,6 @@ def main():
                 # # save input and expected output
                 home_team_data = team_estimated_metrics[game.home_team_id]
                 away_team_data = team_estimated_metrics[game.away_team_id]
-                home_team_data.update(team_performance_map[game.home_team_id][str(game.game_id)])
-                away_team_data.update(team_performance_map[game.away_team_id][str(game.game_id)])
                 ml_input_data.append(encode_data(home_team_data, away_team_data))
                 ml_output_data.append(1 if game.home_team_won else 0)
             else:
