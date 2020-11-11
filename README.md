@@ -15,7 +15,7 @@ Adjusting the epochs, number of layers, input data size, or batch size didn't ha
 
 ### Findings
 - So far, the best win / loss prediction accuracy I could achieve was a **~68%** accuracy (using 5-fold cross validation)
-- If we predict games based only on win rate (always predict that the team with higher win percentage, then we achieve **~62%** accuracy)
+- If we predict games based only on win rate (i.e if we always predict that the team with higher win percentage will win the match, then we achieve **~62%** accuracy)
 - With a simple DNN with one hidden layer and using the following metrics as input:
   - \# wins
   - \# losses
